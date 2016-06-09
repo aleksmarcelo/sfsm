@@ -1,0 +1,108 @@
+Simple Finite State Machine
+===========================
+
+Finite state machine implemented in Java language +
+
+
+
+
+== Sample code and instructions
+
+[source,java]
+----
+SimpleFSM fsm = new SimpleFSM() { <1>
+      @Override
+      public void onExit(Exception ex) { <2>
+        System.out.println("THE END with error=" + ex);
+        System.out.println("vals = " + Arrays.toString(  (int[]) this.get("val")) );
+      }
+      
+    };
+    
+
+    int secs[] = new int[]{3, 0};
+    Node n2 = fsm.addState("T1", () -> { <3>
+      System.out.printf("First Node  pausa=%d secs\n", secs[0]);
+
+      TimeUnit.SECONDS.sleep(secs[0]--);
+
+    }).setTimeout(2000) <4>
+      .setRetries(5); <4>
+
+    fsm.addState(() -> { <3>
+      System.out.println("no name");
+      if (val[1]++ == 0) throw new Exception("I don´t like zeros!");
+    }).setNextOnError("T1"); <5>
+
+    
+    fsm.addState("T3", () -> {
+      System.out.println("Third Node");
+      secs[0] = 7;
+    }).setNext("T1"); <4>
+
+    
+    
+    //Redirect the log output to the sys out
+    //fsm.setLogStream(System.out); <6>
+    fsm.print(); <7>
+    fsm.start(); <8>
+    //fsm.startInSameThread(); <9>
+    
+    // System.out.println("Must stop now!!");
+    // fsm.mustStop();
+----
+
+== How to use
+
+<1> Implement an object of the class SimpleFSM 
+<2> If you want you can override the onExit method to be signalized when the FSM finishes
+<3> Add a state, you can pass a name or ommit it.
+<4> You can define the Timeout, number of retries and the next state to be executed on success
+<5> ... or the next one to go in when something goes [red]#wrong#
+<6> Define your log output
+<7> Print the nodes
+<8> Start the state machine on a separate thread
+<9> Start the state machine on the current thread
+
+== Bonus
+The SimpleFSM is capable of store store variables, so like a hashmap, you are able to simply call: *fsm.save*(_key_, _some_object_ ) and after the execution the value will be able to be got using *fsm.get*(_key_).
+
+[source,]
+----
+    final SimpleFSM fsm = new SimpleFSM() { <3>
+      @Override
+      public void onExit(Exception ex) {
+        System.out.println("THE END with error=" + ex);
+        System.out.println("vals = " + Arrays.toString(  (int[]) this.get("val")) ); <2>
+      }
+    };
+    
+
+    int val[] = new int[]{5, 0};
+    Node n2 = fsm.addState("T1", () -> {
+      System.out.printf("First Node  pausa=%d secs\n", val[0]);
+      fsm.save("val", val ); <1>
+      TimeUnit.SECONDS.sleep(val[0]--);
+    }).setTimeout(2000)
+      .setRetries(5);
+      
+----
+
+<1> Save the data using the fsm object (3) 
+<2> Inside onExit we are in the fsm instance, so this points to the object itself
+
+
+=== Finishing the FSM
+
+If you need to close FSM using brute force, just use *mustStop()* It will finish all the pending threads, but will continue to call the ending  method (onExit).
+
+
+
+
+== ENJOY !!!
+
+
+
+
+
+
