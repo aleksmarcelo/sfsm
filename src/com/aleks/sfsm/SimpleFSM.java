@@ -9,9 +9,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,7 +36,9 @@ public class SimpleFSM extends Thread {
   PrintStream log;
   private Exception gex; //Gobal variable to save the exception object
   private boolean gbContinue;
-  Map<String, Object> gSave = new HashMap();
+  private Map<String, Object> gSave = new ConcurrentHashMap();
+  private Future future = null;
+  private Node jumpToNode = null;
 
   /**
    * Creates a new Simple Finite State Machine
@@ -102,19 +104,31 @@ public class SimpleFSM extends Thread {
     run();
   }
 
-  Future future;
+  @Override
+  public synchronized void start() {
+    gbContinue = true;
+    super.start();
+  }
+
+  public void moveToState(String state) {
+    jumpToNode = getNodeByName(state);
+    if (future != null)
+      future.cancel(true);
+
+  }
 
   public void mustStop() {
     gbContinue = false;
-    future.cancel(true);
+    if (future != null)
+      future.cancel(true);
     gex = new CancellationException("Stoped forced");
-    cleanAndFinish();
+
+    poolThread.shutdownNow();
   }
 
   @Override
   public void run() {
     execNode = listStates.get(0);
-    gbContinue = true;
 
     while (gbContinue) {
       gex = null;
@@ -134,8 +148,8 @@ public class SimpleFSM extends Thread {
 
         //Wait for the thread completion
         future.get(execNode.getTimeout(), TimeUnit.MILLISECONDS);
-        if (future.isCancelled())
-          System.err.println("It must be treated outside!!!");
+//        if (future.isCancelled())
+//          System.err.println("It must be treated outside!!!");
 
       } catch (InterruptedException | ExecutionException ex) {
         log.println("  \033[31m [Error] " + ex.getMessage() + "  " + ex.getStackTrace()[1]);
@@ -149,13 +163,19 @@ public class SimpleFSM extends Thread {
         future.cancel(true);
         log.println("  \033[31m [Error] Step Not Found " + ex.getMessage() + "  " + ex.getStackTrace()[1]);
         gex = ex;
-      } catch (Exception ex) {
+      } catch (CancellationException ex) {
         gex = ex;
       }
 
+      if (jumpToNode != null) {
+        execNode = jumpToNode;
+        jumpToNode = null;
+        continue;
+      }
+      
       execNode = getNextNode();
       if (execNode == null) {
-        log.println("Last Step");
+        log.println("## Last Step ##");
         break;
       }
 
@@ -184,10 +204,11 @@ public class SimpleFSM extends Thread {
   }
 
   /**
-   * Encapsulate the call to the step code, in this way, in the future, we can 
+   * Encapsulate the call to the step code, in this way, in the future, we can
    * pre call and post call the work code.
+   *
    * @param node
-   * @throws Exception 
+   * @throws Exception
    */
   private void execNodeThread(Node node) throws Exception {
 
@@ -214,15 +235,17 @@ public class SimpleFSM extends Thread {
       else
         n = getNodeByName(execNode.getNext());
 
-    log.printf("  \u001B[34m  Next=(%s)  Error=%s \n", n, gex);
+    log.printf("\u001B[34m   %s  Error=%s \n", n, gex);
 
     return n;
   }
 
   private Node getNodeByName(String name) {
-    for (Node node : listStates)
-      if (node.getName().equals(name))
+    for (Node node : listStates) {
+      if (node.getName().equalsIgnoreCase(name))
         return node;
+    }
+    System.err.printf("State [%s] not found !\n", name);
     return null;
   }
 

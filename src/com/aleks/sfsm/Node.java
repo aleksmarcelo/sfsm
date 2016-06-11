@@ -94,7 +94,7 @@ public class Node implements IState {
 
   @Override
   public String toString() {
-    return String.format("Name=%s  Next=%s  nextOnError=%s  timeout=%d  #retries=%d", name, next, nextOnError, timeout, retries);
+    return String.format("[%s]  next=%s  nextOnError=%s  timeout=%dms  #retries=%d", name, next, nextOnError, timeout, retries);
   }
 
 
